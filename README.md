@@ -4,7 +4,7 @@ Interactive 3D schematic of the Taroom Trough (Surat Basin overlying Bowen Basin
 
 ## View / Share
 
-Live link (once GitHub Pages is enabled): **https://gschoning.github.io/TaroomTool/**
+Live link (once GitHub Pages is enabled): **https:///Office-of-Groundwater-Impact-Assessment.github.io/TaroomTrough/**
 
 To enable hosting:
 1. Go to **Settings → Pages** in this repository
