@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taroom Trough Overview</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Arial, sans-serif; background-color: #eef2f5; color: #333; }
+        
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; z-index: 20; }
+        
+        .panel { background: rgba(255, 255, 255, 0.95); padding: 20px; border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); pointer-events: auto; border: 1px solid #ccc; }
+        
+        .header-panel { max-width: 500px; align-self: flex-start; }
+        .header-panel h1 { margin: 0 0 8px 0; font-size: 16px; color: #222; text-transform: uppercase; letter-spacing: 0.5px; }
+        .header-panel p { margin: 0 0 15px 0; font-size: 13px; color: #555; line-height: 1.4; }
+        
+        .controls { display: flex; flex-wrap: wrap; gap: 8px; }
+        button { padding: 8px 12px; font-size: 12px; font-weight: 600; border: 1px solid #bbb; border-radius: 4px; cursor: pointer; background: #f8f9fa; color: #333; transition: 0.2s; }
+        button:hover { background: #e2e6ea; }
+        button.active { background: #2c3e50; color: white; border-color: #2c3e50; }
+
+        #data-panel { position: absolute; width: 300px; display: none; z-index: 50; pointer-events: none; }
+        .dp-title { font-size: 15px; font-weight: bold; color: #2c3e50; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+        .dp-row { display: flex; flex-direction: column; margin-bottom: 10px; }
+        .dp-label { font-size: 11px; text-transform: uppercase; color: #666; font-weight: bold; }
+        .dp-value { font-size: 13px; color: #222; }
+
+        #legend { position: absolute; bottom: 20px; left: 20px; font-size: 12px; background: rgba(255,255,255,0.95); padding: 10px; border-radius: 4px; border: 1px solid #ccc; pointer-events: auto; z-index: 30; }
+        .legend-item { display: flex; align-items: center; margin-bottom: 5px; }
+        .legend-color { width: 12px; height: 12px; margin-right: 8px; border-radius: 2px; }
+
+        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: bold; font-size: 14px; color: #555; z-index: 30; }
+        
+        #labels-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        
+        .html-label { 
+            position: absolute; left: 45px; font-size: 11px; font-weight: bold; color: #222; 
+            transform: translateY(-50%); padding: 4px 8px; background: rgba(255, 255, 255, 0.85); 
+            border: 1px solid #ccc; border-left: 4px solid #555; transition: opacity 0.2s; white-space: nowrap;
+        }
+        .html-label.gw-label { border-left-color: #3498db; }
+        .html-label.en-label { border-left-color: #e74c3c; }
+        .html-label.int-label { border-left-color: #9b59b6; }
+
+        .basin-bracket {
+            position: absolute; width: 12px; left: 20px; z-index: 10;
+            border-left: 2px solid #2B7CB5; border-top: 2px solid #2B7CB5; border-bottom: 2px solid #2B7CB5;
+            border-radius: 4px 0 0 4px; pointer-events: none; transition: opacity 0.2s;
+        }
+        #bowen-bracket { border-color: #555; }
+        
+        .basin-label {
+            position: absolute; left: -15px; top: 50%; transform: translate(-50%, -50%) rotate(-90deg);
+            font-size: 11px; font-weight: bold; letter-spacing: 1.5px; color: #2B7CB5; 
+            text-transform: uppercase; white-space: nowrap;
+        }
+        #bowen-bracket .basin-label { color: #555; }
+
+        .leader-line {
+            position: absolute; height: 0; border-bottom: 1px dashed #999;
+            z-index: 5; pointer-events: none; transition: opacity 0.2s;
+        }
+
+        .well-label {
+            position: absolute; font-size: 11px; font-weight: bold; color: #333;
+            background: rgba(255, 255, 255, 0.9); padding: 4px 8px; border-radius: 2px;
+            transform: translate(-50%, -100%); white-space: nowrap; transition: opacity 0.2s;
+            border: 1px solid #ccc; border-bottom: 3px solid #333; z-index: 15;
+            margin-top: -10px;
+        }
+
+        #depth-axis-line {
+            position: absolute; right: 20px; width: 2px; background-color: #555; z-index: 10;
+        }
+
+        .depth-label {
+            position: absolute; right: 22px; font-size: 11px; font-weight: bold; color: #555;
+            transform: translateY(-50%); padding-right: 8px; user-select: none; z-index: 10;
+        }
+
+        .depth-label::after {
+            content: ''; position: absolute; right: -2px; top: 50%; width: 6px; height: 2px; background-color: #555;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="loading">Initializing Geometry...</div>
+
+    <div id="ui-layer">
+        <div class="panel header-panel">
+            <h1>Taroom Trough Overview</h1>
+            <p>Geology and extractive industries.</p>
+            <div class="controls">
+                <button class="filter-btn active" data-filter="all">System Overview</button>
+                <button class="filter-btn" data-filter="groundwater">Groundwater Systems</button>
+                <button class="filter-btn" data-filter="energy">Hydrocarbon Targets</button>
+                <button class="filter-btn" data-filter="interaction">System Interaction</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel" id="data-panel">
+        <div class="dp-title" id="dp-name">Formation Name</div>
+        <div class="dp-row">
+            <span class="dp-label">Lithology</span>
+            <span class="dp-value" id="dp-lith">...</span>
+        </div>
+        <div class="dp-row">
+            <span class="dp-label">Hydrogeological Role</span>
+            <span class="dp-value" id="dp-role">...</span>
+        </div>
+        <div class="dp-row">
+            <span class="dp-label">Depth to Top</span>
+            <span class="dp-value" id="dp-depth">...</span>
+        </div>
+    </div>
+
+    <div id="legend">
+        <div style="font-weight:bold; margin-bottom: 8px; border-bottom: 1px solid #ccc; padding-bottom: 4px;">Extraction Dynamics</div>
+        <div class="legend-item"><div class="legend-color" style="background:#0088ff;"></div> Groundwater Flow</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ff4400;"></div> Hydrocarbon Flow (Gas)</div>
+        <div class="legend-item"><div class="legend-color" style="background:#222222;"></div> Hydrocarbon Flow (Oil)</div>
+    </div>
+
+    <div id="labels-container"></div>
+
+    <script>
+        // Stratigraphic Data
+        const stratData = [
+            { id: "rolling", basin: "surat", name: "Rolling Downs Group", thickness: 450, color: 0xcccccc, lith: "Siltstone/Mudstone", role: "Regional Aquitard", isGw: false, isEn: false },
+            { id: "blythesdale", basin: "surat", name: "Blythesdale Group", thickness: 300, color: 0x87CEEB, lith: "Sandstone", role: "Minor Aquifer", isGw: true, isEn: false },
+            { id: "springbok", basin: "surat", name: "Springbok Sandstone", thickness: 150, color: 0x98c1d9, lith: "Sandstone", role: "Minor Aquifer", isGw: true, isEn: false },
+            { id: "walloon", basin: "surat", name: "Walloon Coal Measures", thickness: 300, color: 0xa0a0a0, lith: "Interbedded Coal / Siltstone", role: "CSG Target", isGw: false, isEn: true },
+            { id: "hutton", basin: "surat", name: "Hutton Sandstone", thickness: 350, color: 0x4A90E2, lith: "Sandstone", role: "Major Regional Aquifer", isGw: true, isEn: false },
+            { id: "evergreen", basin: "surat", name: "Evergreen Formation", thickness: 250, color: 0xb0b0b0, lith: "Mudstone/Shale", role: "Regional Seal", isGw: false, isEn: false },
+            { id: "precipice", basin: "surat", name: "Precipice Sandstone", thickness: 100, color: 0x2B7CB5, lith: "Sandstone", role: "Major Regional Aquifer", isGw: true, isEn: false },
+            { id: "unconformity", basin: "none", name: "MAJOR UNCONFORMITY", thickness: 80, color: 0xffffff, lith: "Erosional Surface", role: "Boundary", isGw: false, isEn: false },
+            { id: "moolayember", basin: "bowen", name: "Moolayember Fm", thickness: 450, color: 0xd2b48c, lith: "Siltstone", role: "Regional Aquitard", isGw: false, isEn: false },
+            { id: "clematis", basin: "bowen", name: "Clematis Group", thickness: 300, color: 0x5B9BD5, lith: "Sandstone", role: "Regional Aquifer", isGw: true, isEn: false },
+            { id: "rewan", basin: "bowen", name: "Rewan Formation", thickness: 700, color: 0x8fbc8f, lith: "Massive Mudstone", role: "Primary Regional Seal", isGw: false, isEn: false, isInter: true },
+            { id: "bandanna", basin: "bowen", name: "Bandanna Formation", thickness: 200, color: 0x444444, lith: "Coal Measures", role: "Deep CSG Target", isGw: false, isEn: false, isInter: true },
+            { id: "tinowon", basin: "bowen", name: "Back Creek Group / Tinowon Formation", thickness: 350, color: 0xcd853f, lith: "Tight Sandstone", role: "Tight Gas Reservoir", isGw: false, isEn: true },
+            { id: "lowermarine", basin: "bowen", name: "Cattle Creek Formation", thickness: 500, color: 0x696969, lith: "Organic Shale", role: "Source Rock", isGw: false, isEn: false },
+            { id: "reids", basin: "bowen", name: "Reids Dome Beds", thickness: 550, color: 0x888888, lith: "Syn-rift Sediments", role: "Basal Sequence", isGw: false, isEn: false }
+        ];
+
+        // Scene Setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef2f5);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(50, 15, 65);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, -20, 0);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight.position.set(20, 50, 20);
+        scene.add(dirLight);
+
+        // Constants & Geometry Parameters
+        const scaleY = 0.01; 
+        const blockX = 46; // Widened for desktop optimization
+        const blockZ = 12;
+        const maxDip = 8; // Trough depth
+        const segmentsX = 96; // Increased resolution
+        
+        let currentY = 0;
+        const layerMeshes = [];
+        const layerDataMap = new Map();
+        
+        const formLabels = [];
+        const wellLabels = [];
+        const depthLabels = [];
+        const labelsContainer = document.getElementById('labels-container');
+        
+        // Initialize Basin Brackets
+        const suratBracket = document.createElement('div');
+        suratBracket.id = 'surat-bracket';
+        suratBracket.className = 'basin-bracket';
+        suratBracket.innerHTML = '<div class="basin-label">Surat Basin</div>';
+        labelsContainer.appendChild(suratBracket);
+
+        const bowenBracket = document.createElement('div');
+        bowenBracket.id = 'bowen-bracket';
+        bowenBracket.className = 'basin-bracket';
+        bowenBracket.innerHTML = '<div class="basin-label">Bowen Basin</div>';
+        labelsContainer.appendChild(bowenBracket);
+
+        const blockGroup = new THREE.Group();
+        scene.add(blockGroup);
+
+        // Helper function: Calculate synclinal dip based on X position
+        function getDipAtX(x) {
+            const xNorm = x / (blockX / 2);
+            return maxDip * (1 - xNorm * xNorm);
+        }
+
+        // Generate Procedural Texture for Unconformity
+        const uncCanvas = document.createElement('canvas');
+        uncCanvas.width = 512;
+        uncCanvas.height = 512;
+        const uncCtx = uncCanvas.getContext('2d');
+        uncCtx.fillStyle = '#ffffff';
+        uncCtx.fillRect(0, 0, 512, 512);
+        uncCtx.fillStyle = '#777777';
+        for(let i=0; i<3000; i++) {
+            uncCtx.beginPath();
+            uncCtx.arc(Math.random()*512, Math.random()*512, Math.random()*2+0.5, 0, Math.PI*2);
+            uncCtx.fill();
+        }
+        uncCtx.strokeStyle = '#555555';
+        uncCtx.lineWidth = 1.5;
+        for(let i=0; i<200; i++) {
+            uncCtx.beginPath();
+            let sx = Math.random()*512;
+            let sy = Math.random()*512;
+            uncCtx.moveTo(sx, sy);
+            uncCtx.lineTo(sx + Math.random()*30-15, sy + Math.random()*30-15);
+            uncCtx.lineTo(sx + Math.random()*30-15, sy + Math.random()*30-15);
+            uncCtx.closePath();
+            uncCtx.stroke();
+        }
+        const uncTex = new THREE.CanvasTexture(uncCanvas);
+        uncTex.wrapS = THREE.RepeatWrapping;
+        uncTex.wrapT = THREE.RepeatWrapping;
+        uncTex.repeat.set(blockX / 8, blockZ / 8);
+
+        // Build Stratigraphy (Trough Model)
+        stratData.forEach((layer, index) => {
+            const h = layer.thickness * scaleY;
+            const yPos = currentY - (h / 2);
+
+            // Special handling for the unconformity to create physical separation
+            if (layer.id === "unconformity") {
+                const planeGeo = new THREE.PlaneGeometry(blockX + 6, blockZ + 6, segmentsX, 1);
+                planeGeo.rotateX(-Math.PI / 2); // Align flat
+                
+                const pos = planeGeo.attributes.position;
+                for(let i = 0; i < pos.count; i++) {
+                    const vx = pos.getX(i);
+                    pos.setY(i, -getDipAtX(vx));
+                }
+                planeGeo.computeVertexNormals();
+
+                const planeMat = new THREE.MeshBasicMaterial({ 
+                    map: uncTex,
+                    color: 0xdddddd,
+                    transparent: true, 
+                    opacity: 0.35, 
+                    side: THREE.DoubleSide, 
+                    depthWrite: false 
+                });
+                const plane = new THREE.Mesh(planeGeo, planeMat);
+                plane.position.set(0, yPos, 0);
+
+                const edges = new THREE.EdgesGeometry(planeGeo);
+                const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x999999, transparent: true, opacity: 0.4 }));
+                line.position.set(0, yPos, 0);
+
+                blockGroup.add(plane);
+                blockGroup.add(line);
+                
+                // Allow interaction with the unconformity layer
+                layerMeshes.push(plane);
+                layerDataMap.set(plane.uuid, layer);
+
+                // Add label for Unconformity
+                const label = document.createElement('div');
+                label.className = 'html-label';
+                label.innerText = layer.name;
+                label.style.borderLeftColor = '#999';
+                labelsContainer.appendChild(label);
+                
+                const lineElem = document.createElement('div');
+                lineElem.className = 'leader-line';
+                labelsContainer.appendChild(lineElem);
+                
+                formLabels.push({ element: label, line: lineElem, yPos: yPos, id: layer.id });
+
+                layer.centerDepth = yPos;
+                layer.topDepth = currentY;
+                currentY -= h; // Creates the 80m physical gap
+                return;
+            }
+
+            const geometry = new THREE.BoxGeometry(blockX, h, blockZ, segmentsX, 1, 1);
+            const pos = geometry.attributes.position;
+            
+            // Apply Trough Bend
+            for(let i = 0; i < pos.count; i++) {
+                const vx = pos.getX(i);
+                const vy = pos.getY(i);
+                let dip = getDipAtX(vx);
+                
+                // Keep surface (top of first layer) perfectly flat
+                if (index === 0 && vy > 0) {
+                    dip = 0;
+                }
+                
+                pos.setY(i, vy - dip);
+            }
+            geometry.computeVertexNormals();
+
+            // Edges (Use threshold to hide internal subdivisions)
+            const edges = new THREE.EdgesGeometry(geometry, 15);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0x333333, linewidth: 1, transparent: true, opacity: 0.3 });
+            const line = new THREE.LineSegments(edges, lineMat);
+            
+            const material = new THREE.MeshStandardMaterial({ color: layer.color, transparent: true, opacity: 0.8, roughness: 0.8 });
+            const mesh = new THREE.Mesh(geometry, material);
+            
+            mesh.position.set(0, yPos, 0);
+            line.position.set(0, yPos, 0);
+            mesh.userData.edgeLine = line;
+            
+            blockGroup.add(mesh);
+            blockGroup.add(line);
+            
+            const label = document.createElement('div');
+            label.className = 'html-label';
+            if(layer.isGw) label.classList.add('gw-label');
+            if(layer.isEn) label.classList.add('en-label');
+            if(layer.isInter) label.classList.add('int-label');
+            label.innerText = layer.name;
+            labelsContainer.appendChild(label);
+            
+            const lineElem = document.createElement('div');
+            lineElem.className = 'leader-line';
+            labelsContainer.appendChild(lineElem);
+            
+            formLabels.push({ element: label, line: lineElem, yPos: yPos, id: layer.id });
+
+            layerMeshes.push(mesh);
+            layerDataMap.set(mesh.uuid, layer);
+
+            // Record edge depths
+            layer.centerDepth = yPos;
+            layer.topDepth = currentY;
+            currentY -= h;
+        });
+        const totalDepthY = currentY;
+
+        // Depth Axis Generation (HTML Anchored to Right)
+        const axisLineHtml = document.createElement('div');
+        axisLineHtml.id = 'depth-axis-line';
+        labelsContainer.appendChild(axisLineHtml);
+
+        for (let d = 0; d <= 5000; d += 1000) {
+            const y = -(d * scaleY);
+            const lbl = document.createElement('div');
+            lbl.className = 'depth-label';
+            lbl.innerText = d + 'm';
+            labelsContainer.appendChild(lbl);
+            depthLabels.push({ element: lbl, yPos: y });
+        }
+
+        // Surface Environment (Flat)
+        const surfaceGeo = new THREE.PlaneGeometry(blockX, blockZ);
+        const surfaceMat = new THREE.MeshStandardMaterial({ color: 0x558b2f, side: THREE.DoubleSide });
+        const surfacePlane = new THREE.Mesh(surfaceGeo, surfaceMat);
+        surfacePlane.rotation.x = -Math.PI / 2;
+        surfacePlane.position.y = 0.01;
+        blockGroup.add(surfacePlane);
+
+        // Surface Vegetation (Trees)
+        const trunkGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.4, 4);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
+        const canopyGeo = new THREE.ConeGeometry(0.3, 1.0, 5);
+        const canopyMat = new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.8 });
+
+        for (let i = 0; i < 60; i++) {
+            const treeGroup = new THREE.Group();
+            
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.position.y = 0.2;
+            
+            const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+            canopy.position.y = 0.7;
+            
+            treeGroup.add(trunk);
+            treeGroup.add(canopy);
+            
+            treeGroup.position.x = (Math.random() - 0.5) * (blockX - 1);
+            treeGroup.position.z = (Math.random() - 0.5) * (blockZ - 1);
+            treeGroup.position.y = 0.01;
+            
+            const scale = 0.6 + Math.random() * 0.6;
+            treeGroup.scale.set(scale, scale, scale);
+            
+            blockGroup.add(treeGroup);
+        }
+
+        // Particle System
+        const particles = [];
+        const particleGeo = new THREE.SphereGeometry(0.3, 8, 8);
+        const matWater = new THREE.MeshBasicMaterial({ color: 0x0088ff, depthTest: false, depthWrite: false });
+        const matGas = new THREE.MeshBasicMaterial({ color: 0xff4400, depthTest: false, depthWrite: false });
+        const matOil = new THREE.MeshBasicMaterial({ color: 0x222222, depthTest: false, depthWrite: false });
+
+        function createFlow(x, z, startY, endY, type, count, isHorizontal = false, hStartX = 0, hEndX = 0, layer = null) {
+            let mat = matWater;
+            if (type === 'gas') mat = matGas;
+            if (type === 'oil') mat = matOil;
+            
+            for(let i=0; i<count; i++) {
+                const mesh = new THREE.Mesh(particleGeo, mat);
+                mesh.renderOrder = 100;
+                scene.add(mesh);
+                particles.push({
+                    mesh: mesh, x: x, z: z, startY: startY, endY: endY,
+                    y: startY + Math.random() * (endY - startY),
+                    speed: 0.05 + Math.random() * 0.03, type: type,
+                    isHorizontal: isHorizontal, hStartX: hStartX, hEndX: hEndX, hProgress: Math.random(),
+                    layer: layer
+                });
+            }
+        }
+
+        // Infrastructure
+        const infrastructureGroup = new THREE.Group();
+        scene.add(infrastructureGroup);
+
+        function drawVerticalWell(x, targetId, isCSG, wellName) {
+            const targetLayer = stratData.find(d => d.id === targetId);
+            const actualDepth = targetLayer.centerDepth - getDipAtX(x); // Compute depth on curved layer
+            const depthLength = Math.abs(actualDepth);
+            
+            const geo = new THREE.CylinderGeometry(0.4, 0.4, depthLength, 8);
+            const mat = new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.15, depthWrite: false });
+            const cylinder = new THREE.Mesh(geo, mat);
+            cylinder.position.set(x, actualDepth / 2, 0);
+            infrastructureGroup.add(cylinder);
+
+            const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, depthLength, 4), new THREE.MeshBasicMaterial({ color: 0x333333 }));
+            tube.position.set(x, actualDepth / 2, 0);
+            infrastructureGroup.add(tube);
+
+            let headGeo;
+            if (isCSG) {
+                headGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+            } else {
+                headGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 16);
+            }
+            const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color: isCSG ? 0x444444 : 0x2980b9 }));
+            head.position.set(x, 0.75, 0);
+            infrastructureGroup.add(head);
+
+            const label = document.createElement('div');
+            label.className = 'well-label';
+            label.innerText = wellName;
+            if(isCSG) label.style.borderBottomColor = '#e74c3c';
+            else label.style.borderBottomColor = '#3498db';
+            labelsContainer.appendChild(label);
+            wellLabels.push({ element: label, localPos: new THREE.Vector3(x, 3.5, 0) });
+
+            if(isCSG) {
+                createFlow(x, 0, actualDepth, 0, 'water', 25);
+                createFlow(x, 0, actualDepth, 0, 'gas', 25);
+            } else {
+                createFlow(x, 0, actualDepth, 0, 'water', 30);
+            }
+        }
+
+        function drawDirectionalWell(xStart, targetId, wellName) {
+            const targetLayer = stratData.find(d => d.id === targetId);
+            const actualDepth = targetLayer.centerDepth - getDipAtX(xStart);
+            const hLength = 6;
+            const xEnd = xStart - hLength;
+
+            const vMat = new THREE.MeshStandardMaterial({ color: 0x888888, transparent: true, opacity: 0.15, depthWrite: false });
+            const tMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+
+            // Vertical Section
+            const vCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, Math.abs(actualDepth), 8), vMat);
+            vCyl.position.set(xStart, actualDepth/2, 0);
+            infrastructureGroup.add(vCyl);
+            
+            const vTube = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, Math.abs(actualDepth), 4), tMat);
+            vTube.position.set(xStart, actualDepth/2, 0);
+            infrastructureGroup.add(vTube);
+
+            // Horizontal Section (Follow the dip of the target formation)
+            const curvePoints = [];
+            for (let i = 0; i <= 20; i++) {
+                const t = i / 20;
+                const cx = xStart - t * hLength;
+                const cy = targetLayer.centerDepth - getDipAtX(cx);
+                curvePoints.push(new THREE.Vector3(cx, cy, 0));
+            }
+            const hCurve = new THREE.CatmullRomCurve3(curvePoints);
+            
+            const hCylGeo = new THREE.TubeGeometry(hCurve, 20, 0.4, 8, false);
+            const hCyl = new THREE.Mesh(hCylGeo, vMat);
+            infrastructureGroup.add(hCyl);
+
+            const hTubeGeo = new THREE.TubeGeometry(hCurve, 20, 0.05, 4, false);
+            const hTube = new THREE.Mesh(hTubeGeo, tMat);
+            infrastructureGroup.add(hTube);
+
+            // Surface Unit
+            const head = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+            head.position.set(xStart, 1, 0);
+            infrastructureGroup.add(head);
+
+            const label = document.createElement('div');
+            label.className = 'well-label';
+            label.innerText = wellName;
+            label.style.borderBottomColor = '#e74c3c';
+            labelsContainer.appendChild(label);
+            wellLabels.push({ element: label, localPos: new THREE.Vector3(xStart, 3.5, 0) });
+
+            // Pass the targetLayer to dynamically adjust particle flow path
+            createFlow(xStart, 0, actualDepth, 0, 'gas', 20, true, xEnd, xStart, targetLayer);
+            createFlow(xStart, 0, actualDepth, 0, 'oil', 20, true, xEnd, xStart, targetLayer);
+        }
+
+        // Infrastructure layout: water bores on sides, gas/oil extraction central
+        drawVerticalWell(-16, "blythesdale", false, "Water Bore");     
+        drawVerticalWell(-8, "hutton", false, "Water Bore");       
+        drawVerticalWell(0, "walloon", true, "Shallow CSG Well");        
+        drawDirectionalWell(8, "tinowon", "Tight Gas / Oil Well");
+        drawVerticalWell(16, "precipice", false, "Water Bore");       
+
+        document.getElementById('loading').style.display = 'none';
+
+        // Interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const dataPanel = document.getElementById('data-panel');
+        let hoveredMesh = null;
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(layerMeshes);
+
+            if (intersects.length > 0) {
+                document.body.style.cursor = 'pointer';
+                const mesh = intersects[0].object;
+                if (hoveredMesh !== mesh) {
+                    if (hoveredMesh && hoveredMesh.material.emissive) {
+                        // Reset emissive, safely check if property exists
+                        hoveredMesh.material.emissive.setHex(0x000000);
+                    }
+                    hoveredMesh = mesh;
+                    // Only apply emissive highlight if it's a solid block, not the unconformity plane (which uses BasicMaterial)
+                    const data = layerDataMap.get(mesh.uuid);
+                    if (data && data.id !== "unconformity" && hoveredMesh.material.emissive) {
+                        hoveredMesh.material.emissive.setHex(0x222222);
+                    }
+                }
+            } else {
+                document.body.style.cursor = 'default';
+                if (hoveredMesh) {
+                    if (hoveredMesh.material.emissive) {
+                        hoveredMesh.material.emissive.setHex(0x000000);
+                    }
+                    hoveredMesh = null;
+                }
+            }
+        });
+
+        window.addEventListener('click', (e) => {
+            if(e.target.closest('.controls') || e.target.closest('#legend')) return;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(layerMeshes);
+
+            if (intersects.length > 0) {
+                const mesh = intersects[0].object;
+                const data = layerDataMap.get(mesh.uuid);
+                
+                const activeFilter = document.querySelector('.filter-btn.active').dataset.filter;
+
+                if (activeFilter === 'interaction' && data.isInter) {
+                    document.getElementById('dp-name').innerText = "Intervening Formations";
+                    document.getElementById('dp-lith').innerText = "Mixed (Mudstone & Coal)";
+                    document.getElementById('dp-role').innerText = "Hydraulic Separation Zone";
+                    document.getElementById('dp-depth').innerText = "Regional Extent";
+                } else {
+                    document.getElementById('dp-name').innerText = data.name;
+                    document.getElementById('dp-lith').innerText = data.lith;
+                    document.getElementById('dp-role').innerText = data.role;
+                    document.getElementById('dp-depth').innerText = '~' + (Math.round(Math.abs(data.topDepth) / scaleY / 50) * 50) + ' m';
+                }
+                
+                dataPanel.style.display = 'block';
+                let leftPos = e.clientX + 15;
+                let topPos = e.clientY + 15;
+                if(leftPos + 300 > window.innerWidth) leftPos = window.innerWidth - 320;
+                if(topPos + 200 > window.innerHeight) topPos = window.innerHeight - 220;
+                
+                dataPanel.style.left = leftPos + 'px';
+                dataPanel.style.top = topPos + 'px';
+            } else {
+                dataPanel.style.display = 'none';
+            }
+        });
+
+        // Filter Logic
+        const buttons = document.querySelectorAll('.filter-btn');
+        buttons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                buttons.forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                const filter = e.target.dataset.filter;
+
+                layerMeshes.forEach(mesh => {
+                    const data = layerDataMap.get(mesh.uuid);
+                    
+                    // Reset to base configuration
+                    if (data.id !== "unconformity" && mesh.material.color) {
+                         mesh.material.color.setHex(data.color);
+                    }
+                    if (mesh.userData.edgeLine) mesh.userData.edgeLine.material.opacity = 0.3;
+
+                    if (filter === 'all' || data.id === 'unconformity') {
+                        mesh.material.opacity = data.id === 'unconformity' ? 0.35 : 0.8;
+                    } else if (filter === 'groundwater' && data.isGw) {
+                        mesh.material.opacity = 0.9;
+                    } else if (filter === 'energy' && data.isEn) {
+                        mesh.material.opacity = 0.9;
+                    } else if (filter === 'interaction') {
+                        if (data.isGw || data.isEn) {
+                            mesh.material.opacity = 0.9;
+                        } else if (data.isInter) {
+                            mesh.material.opacity = 0.85;
+                            if (mesh.material.color) mesh.material.color.setHex(0x9b59b6); // Unified color for intervening sequence
+                            if (mesh.userData.edgeLine) mesh.userData.edgeLine.material.opacity = 0.05; // Fade internal strata lines
+                        } else {
+                            mesh.material.opacity = 0.04;
+                        }
+                    } else {
+                        mesh.material.opacity = 0.04;
+                    }
+                });
+
+                formLabels.forEach(lbl => {
+                    const layer = stratData.find(d => d.id === lbl.id);
+                    lbl.hiddenByFilter = false; // Reset visibility override
+                    lbl.element.innerText = layer.name; // Reset name
+                    
+                    if (filter === 'all' || layer.id === 'unconformity') {
+                        lbl.element.style.opacity = 1;
+                        lbl.line.style.opacity = 1;
+                    }
+                    else if (filter === 'groundwater' && layer.isGw) {
+                        lbl.element.style.opacity = 1;
+                        lbl.line.style.opacity = 1;
+                    }
+                    else if (filter === 'energy' && layer.isEn) {
+                        lbl.element.style.opacity = 1;
+                        lbl.line.style.opacity = 1;
+                    }
+                    else if (filter === 'interaction') {
+                        if (layer.isGw || layer.isEn) {
+                            lbl.element.style.opacity = 1;
+                            lbl.line.style.opacity = 1;
+                        } else if (layer.isInter) {
+                            if (layer.id === 'rewan') {
+                                lbl.element.innerText = "Intervening Formations";
+                                lbl.element.style.opacity = 1;
+                                lbl.line.style.opacity = 1;
+                            } else {
+                                lbl.hiddenByFilter = true; // Completely hide subsequent labels in unified view
+                            }
+                        } else {
+                            lbl.element.style.opacity = 0.15;
+                            lbl.line.style.opacity = 0.15;
+                        }
+                    }
+                    else {
+                        lbl.element.style.opacity = 0.15;
+                        lbl.line.style.opacity = 0.15;
+                    }
+                });
+                
+                // Opacity for brackets
+                if (filter === 'all') {
+                    suratBracket.style.opacity = 1;
+                    bowenBracket.style.opacity = 1;
+                } else {
+                    suratBracket.style.opacity = 0.3;
+                    bowenBracket.style.opacity = 0.3;
+                }
+            });
+        });
+
+        const tempV = new THREE.Vector3();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            blockGroup.rotation.y += 0.001;
+            infrastructureGroup.rotation.y += 0.001;
+
+            // Particles
+            particles.forEach(p => {
+                if (p.isHorizontal) {
+                    if (p.hProgress < 1) {
+                        p.hProgress += p.speed * 0.2;
+                        p.mesh.position.x = p.hStartX + (p.hEndX - p.hStartX) * p.hProgress;
+                        
+                        // Sync Y position precisely with curved formation
+                        if (p.layer) {
+                            p.mesh.position.y = p.layer.centerDepth - getDipAtX(p.mesh.position.x);
+                        } else {
+                            p.mesh.position.y = p.startY;
+                        }
+                        p.y = p.mesh.position.y; // Track Y to transition seamlessly into the vertical shaft
+
+                    } else {
+                        p.y += p.speed;
+                        p.mesh.position.x = p.hEndX;
+                        p.mesh.position.y = p.y;
+                        if (p.y > p.endY) { p.hProgress = 0; }
+                    }
+                } else {
+                    p.y += p.speed;
+                    if (p.y > p.endY) p.y = p.startY;
+                    p.mesh.position.y = p.y;
+                    p.mesh.position.x = p.x;
+                }
+                
+                tempV.set(p.mesh.position.x, p.mesh.position.y, p.z);
+                tempV.applyAxisAngle(new THREE.Vector3(0,1,0), blockGroup.rotation.y);
+                p.mesh.position.set(tempV.x, tempV.y, tempV.z);
+            });
+
+            // Sync Formation Labels and Basin Brackets
+            let suratMinY = Infinity, suratMaxY = -Infinity;
+            let bowenMinY = Infinity, bowenMaxY = -Infinity;
+
+            formLabels.forEach(lbl => {
+                // Stable vertical anchor
+                const centerV = new THREE.Vector3(0, lbl.yPos, 0).project(camera);
+                const yPx = (centerV.y * -0.5 + 0.5) * window.innerHeight;
+                
+                // Track dynamic horizontal edge to anchor leader line precisely to the rock face
+                const edgeV = new THREE.Vector3(-blockX / 2, lbl.yPos, 0);
+                edgeV.applyAxisAngle(new THREE.Vector3(0,1,0), blockGroup.rotation.y);
+                edgeV.project(camera);
+                const edgeXPx = (edgeV.x * 0.5 + 0.5) * window.innerWidth;
+
+                if (centerV.z > 1 || lbl.hiddenByFilter) {
+                    lbl.element.style.display = 'none';
+                    lbl.line.style.display = 'none';
+                } else {
+                    lbl.element.style.display = 'block';
+                    lbl.line.style.display = 'block';
+                    
+                    lbl.element.style.top = yPx + 'px';
+                    
+                    // Draw leader line from label to geometric edge
+                    const startX = 45 + lbl.element.offsetWidth + 8;
+                    const lineLen = edgeXPx - startX; 
+                    
+                    lbl.line.style.left = startX + 'px';
+                    lbl.line.style.top = yPx + 'px';
+                    lbl.line.style.width = Math.max(0, lineLen) + 'px';
+
+                    // Track bracket bounds
+                    const layer = stratData.find(d => d.id === lbl.id);
+                    if (layer.basin === 'surat') {
+                        if (yPx < suratMinY) suratMinY = yPx;
+                        if (yPx > suratMaxY) suratMaxY = yPx;
+                    } else if (layer.basin === 'bowen') {
+                        if (yPx < bowenMinY) bowenMinY = yPx;
+                        if (yPx > bowenMaxY) bowenMaxY = yPx;
+                    }
+                }
+            });
+
+            if (suratMinY !== Infinity) {
+                suratBracket.style.display = 'block';
+                suratBracket.style.top = (suratMinY - 15) + 'px';
+                suratBracket.style.height = (suratMaxY - suratMinY + 30) + 'px';
+            } else {
+                suratBracket.style.display = 'none';
+            }
+
+            if (bowenMinY !== Infinity) {
+                bowenBracket.style.display = 'block';
+                bowenBracket.style.top = (bowenMinY - 15) + 'px';
+                bowenBracket.style.height = (bowenMaxY - bowenMinY + 30) + 'px';
+            } else {
+                bowenBracket.style.display = 'none';
+            }
+
+            // Sync Well Labels (Surface Anchored)
+            wellLabels.forEach(lbl => {
+                tempV.copy(lbl.localPos).applyAxisAngle(new THREE.Vector3(0,1,0), blockGroup.rotation.y).project(camera);
+                if (tempV.z > 1) lbl.element.style.display = 'none';
+                else {
+                    lbl.element.style.display = 'block';
+                    lbl.element.style.left = (tempV.x * 0.5 + 0.5) * window.innerWidth + 'px';
+                    lbl.element.style.top = (tempV.y * -0.5 + 0.5) * window.innerHeight + 'px';
+                }
+            });
+
+            // Sync Depth Scale Labels (Right Edge Pinned permanently)
+            let minY_px = Infinity;
+            let maxY_px = -Infinity;
+
+            depthLabels.forEach(lbl => {
+                tempV.set(0, lbl.yPos, 0).project(camera);
+                if (tempV.z > 1) lbl.element.style.display = 'none';
+                else {
+                    lbl.element.style.display = 'block';
+                    const topPx = (tempV.y * -0.5 + 0.5) * window.innerHeight;
+                    lbl.element.style.right = '22px';
+                    lbl.element.style.left = 'auto';
+                    lbl.element.style.top = topPx + 'px';
+                    
+                    if (topPx < minY_px) minY_px = topPx;
+                    if (topPx > maxY_px) maxY_px = topPx;
+                }
+            });
+
+            const axisLine = document.getElementById('depth-axis-line');
+            if (minY_px !== Infinity && maxY_px !== -Infinity) {
+                axisLine.style.display = 'block';
+                axisLine.style.right = '20px';
+                axisLine.style.left = 'auto';
+                axisLine.style.top = minY_px + 'px';
+                axisLine.style.height = (maxY_px - minY_px) + 'px';
+            } else {
+                axisLine.style.display = 'none';
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>
