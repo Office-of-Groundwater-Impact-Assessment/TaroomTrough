@@ -85,6 +85,41 @@
         .depth-label::after {
             content: ''; position: absolute; right: -2px; top: 50%; width: 6px; height: 2px; background-color: #555;
         }
+
+        /* Well construction modal */
+        #well-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 30, 0.55); backdrop-filter: blur(2px);
+            display: none; align-items: center; justify-content: center;
+            z-index: 100; pointer-events: auto;
+        }
+        #well-modal {
+            background: #ffffff; width: min(1080px, 96vw); max-height: 92vh;
+            border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+            display: flex; flex-direction: column; overflow: hidden;
+            border: 1px solid #bbb;
+        }
+        .wm-header {
+            display: flex; align-items: flex-start; justify-content: space-between;
+            padding: 16px 20px; border-bottom: 1px solid #e3e7ea; background: #f8f9fa;
+        }
+        .wm-header .wm-titles { display: flex; flex-direction: column; }
+        .wm-header h2 { margin: 0; font-size: 17px; color: #2c3e50; text-transform: uppercase; letter-spacing: 0.5px; }
+        .wm-header .wm-sub { font-size: 12px; color: #2B7CB5; font-weight: 600; margin-top: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        #wm-close {
+            border: none; background: transparent; font-size: 26px; line-height: 1;
+            color: #888; cursor: pointer; padding: 0 4px; margin: -2px -4px 0 12px;
+        }
+        #wm-close:hover { color: #2c3e50; }
+        .wm-body { display: flex; flex-wrap: wrap; gap: 20px; padding: 20px; overflow: auto; }
+        #wm-diagram { flex: 1 1 620px; min-width: 340px; }
+        #wm-diagram svg { width: 100%; height: auto; display: block; }
+        #wm-details { flex: 1 1 240px; min-width: 220px; font-size: 13px; }
+        #wm-details h3 { margin: 0 0 12px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #2c3e50; border-bottom: 1px solid #e3e7ea; padding-bottom: 6px; }
+        .wm-spec { display: flex; flex-direction: column; margin-bottom: 12px; }
+        .wm-spec .k { font-size: 11px; text-transform: uppercase; color: #777; font-weight: bold; letter-spacing: 0.3px; }
+        .wm-spec .v { font-size: 13px; color: #222; margin-top: 2px; }
+        .wm-note { font-size: 11px; color: #888; line-height: 1.5; margin-top: 16px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -128,6 +163,26 @@
         <div class="legend-item"><div class="legend-color" style="background:#222222;"></div> Hydrocarbon Flow (Oil)</div>
     </div>
 
+    <div id="well-modal-overlay">
+        <div id="well-modal">
+            <div class="wm-header">
+                <div class="wm-titles">
+                    <h2 id="wm-title">Well</h2>
+                    <span class="wm-sub" id="wm-subtitle"></span>
+                </div>
+                <button id="wm-close" title="Close">&times;</button>
+            </div>
+            <div class="wm-body">
+                <div id="wm-diagram"></div>
+                <div id="wm-details">
+                    <h3>Construction Details</h3>
+                    <div id="wm-spec-list"></div>
+                    <div class="wm-note">Schematic only. Dimensions and depths are representative of a typical completion and are not to scale.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="labels-container"></div>
 
     <script>
@@ -141,14 +196,23 @@
             { id: "evergreen", basin: "surat", name: "Evergreen Formation", thickness: 250, color: 0xb0b0b0, lith: "Mudstone/Shale", role: "Regional Seal", isGw: false, isEn: false },
             { id: "precipice", basin: "surat", name: "Precipice Sandstone", thickness: 100, color: 0x2B7CB5, lith: "Sandstone", role: "Major Regional Aquifer", isGw: true, isEn: false },
             { id: "unconformity", basin: "none", name: "MAJOR UNCONFORMITY", thickness: 80, color: 0xffffff, lith: "Erosional Surface", role: "Boundary", isGw: false, isEn: false },
-            { id: "moolayember", basin: "bowen", name: "Moolayember Fm", thickness: 450, color: 0xd2b48c, lith: "Siltstone", role: "Regional Aquitard", isGw: false, isEn: false },
-            { id: "clematis", basin: "bowen", name: "Clematis Group", thickness: 300, color: 0x5B9BD5, lith: "Sandstone", role: "Regional Aquifer", isGw: true, isEn: false },
+            { id: "moolayember", basin: "bowen", name: "Moolayember Fm", thickness: 450, color: 0xd2b48c, lith: "Siltstone", role: "Regional Aquitard", isGw: false, isEn: false, isInter: true },
+            { id: "clematis", basin: "bowen", name: "Clematis Group", thickness: 300, color: 0x5B9BD5, lith: "Sandstone", role: "Deep Aquifer (not utilised)", isGw: false, isEn: false, isInter: true },
             { id: "rewan", basin: "bowen", name: "Rewan Formation", thickness: 700, color: 0x8fbc8f, lith: "Massive Mudstone", role: "Primary Regional Seal", isGw: false, isEn: false, isInter: true },
-            { id: "bandanna", basin: "bowen", name: "Bandanna Formation", thickness: 200, color: 0x444444, lith: "Coal Measures", role: "Deep CSG Target", isGw: false, isEn: false, isInter: true },
+            { id: "bandanna", basin: "bowen", name: "Kianga / Bandanna Formation", thickness: 200, color: 0xb5651d, lith: "Coal Measures / Tight Sandstone", role: "Tight Gas Reservoir", isGw: false, isEn: true },
             { id: "tinowon", basin: "bowen", name: "Back Creek Group / Tinowon Formation", thickness: 350, color: 0xcd853f, lith: "Tight Sandstone", role: "Tight Gas Reservoir", isGw: false, isEn: true },
             { id: "lowermarine", basin: "bowen", name: "Cattle Creek Formation", thickness: 500, color: 0x696969, lith: "Organic Shale", role: "Source Rock", isGw: false, isEn: false },
             { id: "reids", basin: "bowen", name: "Reids Dome Beds", thickness: 550, color: 0x888888, lith: "Syn-rift Sediments", role: "Basal Sequence", isGw: false, isEn: false }
         ];
+
+        // Stratigraphic column with cumulative top/bottom depths (m) for the well diagrams
+        let _cumDepth = 0;
+        const formationColumn = stratData.map(l => {
+            const topM = _cumDepth;
+            _cumDepth += l.thickness;
+            return { id: l.id, name: l.name, topM: topM, botM: _cumDepth, isGw: !!l.isGw,
+                     color: '#' + l.color.toString(16).padStart(6, '0') };
+        });
 
         // Scene Setup
         const scene = new THREE.Scene();
@@ -187,6 +251,7 @@
         
         const formLabels = [];
         const wellLabels = [];
+        const wellMeshes = [];
         const depthLabels = [];
         const labelsContainer = document.getElementById('labels-container');
         
@@ -211,6 +276,7 @@
             const xNorm = x / (blockX / 2);
             return maxDip * (1 - xNorm * xNorm);
         }
+
 
         // Generate Procedural Texture for Unconformity
         const uncCanvas = document.createElement('canvas');
@@ -302,18 +368,18 @@
 
             const geometry = new THREE.BoxGeometry(blockX, h, blockZ, segmentsX, 1, 1);
             const pos = geometry.attributes.position;
-            
+
             // Apply Trough Bend
             for(let i = 0; i < pos.count; i++) {
                 const vx = pos.getX(i);
                 const vy = pos.getY(i);
                 let dip = getDipAtX(vx);
-                
+
                 // Keep surface (top of first layer) perfectly flat
                 if (index === 0 && vy > 0) {
                     dip = 0;
                 }
-                
+
                 pos.setY(i, vy - dip);
             }
             geometry.computeVertexNormals();
@@ -371,45 +437,160 @@
             depthLabels.push({ element: lbl, yPos: y });
         }
 
-        // Surface Environment (Flat)
+        // Surface Environment (flat geometry; realism via a procedural ground texture)
+        const gasPadXs = [0, 8];               // only gas wells get gravel pads (CSG + tight gas)
+        const waterBoreXs = [-16, -8, 16];     // water bores sit in open paddock, no pad
+        const trackZ = 2.6;                    // access track running between the pads
+
+        // Map world coords onto the surface texture (plane is rotated -90deg about X)
+        const groundCanvas = document.createElement('canvas');
+        groundCanvas.width = 1024;
+        groundCanvas.height = 256;
+        const gctx = groundCanvas.getContext('2d');
+        const u = wx => (wx + blockX / 2) / blockX * groundCanvas.width;
+        const v = wz => (blockZ / 2 - wz) / blockZ * groundCanvas.height;
+        const uw = w => w / blockX * groundCanvas.width;
+        const vw = w => w / blockZ * groundCanvas.height;
+
+        // Base: dry straw-coloured pasture with olive-khaki patches (semi-arid)
+        gctx.fillStyle = '#b9a868';
+        gctx.fillRect(0, 0, groundCanvas.width, groundCanvas.height);
+        const grassTones = ['#c2b072', '#a89a5e', '#b5a364', '#8f8a52', '#cdbc82', '#7d8a4f', '#9aa05c'];
+        for (let i = 0; i < 1400; i++) {
+            gctx.fillStyle = grassTones[Math.floor(Math.random() * grassTones.length)];
+            gctx.globalAlpha = 0.10 + Math.random() * 0.25;
+            gctx.beginPath();
+            gctx.ellipse(Math.random() * 1024, Math.random() * 256,
+                         6 + Math.random() * 26, 4 + Math.random() * 14,
+                         Math.random() * Math.PI, 0, Math.PI * 2);
+            gctx.fill();
+        }
+        // Scattered bare red-brown earth patches
+        for (let i = 0; i < 160; i++) {
+            gctx.fillStyle = Math.random() < 0.5 ? '#a6713f' : '#b07d4a';
+            gctx.globalAlpha = 0.10 + Math.random() * 0.20;
+            gctx.beginPath();
+            gctx.ellipse(Math.random() * 1024, Math.random() * 256,
+                         4 + Math.random() * 14, 3 + Math.random() * 9,
+                         Math.random() * Math.PI, 0, Math.PI * 2);
+            gctx.fill();
+        }
+        gctx.globalAlpha = 1;
+
+        // Access track: a dirt road along the pads, with a spur into each pad
+        function drawTrack(x1, z1, x2, z2, width) {
+            gctx.strokeStyle = '#b58a58';
+            gctx.lineWidth = vw(width);
+            gctx.lineCap = 'round';
+            gctx.beginPath();
+            gctx.moveTo(u(x1), v(z1));
+            gctx.lineTo(u(x2), v(z2));
+            gctx.stroke();
+            // wheel ruts
+            gctx.strokeStyle = '#9a6f42';
+            gctx.lineWidth = Math.max(1, vw(width) * 0.18);
+            [-width * 0.25, width * 0.25].forEach(o => {
+                const dx = x2 - x1, dz = z2 - z1, len = Math.hypot(dx, dz) || 1;
+                const ox = -dz / len * o, oz = dx / len * o;
+                gctx.beginPath();
+                gctx.moveTo(u(x1 + ox), v(z1 + oz));
+                gctx.lineTo(u(x2 + ox), v(z2 + oz));
+                gctx.stroke();
+            });
+        }
+        drawTrack(-blockX / 2, trackZ, blockX / 2, trackZ, 0.55);
+        gasPadXs.forEach(px => drawTrack(px, trackZ, px, 0, 0.45));
+
+        // Gravel well pads under the gas wellheads only
+        gasPadXs.forEach(px => {
+            const padW = 3.4, padD = 2.6;
+            gctx.fillStyle = '#c2b59b';
+            gctx.fillRect(u(px - padW / 2), v(padD / 2), uw(padW), vw(padD));
+            // gravel speckle
+            for (let i = 0; i < 160; i++) {
+                gctx.fillStyle = Math.random() < 0.5 ? '#d6cab2' : '#a89a7e';
+                gctx.globalAlpha = 0.5;
+                gctx.fillRect(u(px - padW / 2) + Math.random() * uw(padW),
+                              v(padD / 2) + Math.random() * vw(padD), 1.5, 1.5);
+            }
+            gctx.globalAlpha = 1;
+        });
+
+        const groundTex = new THREE.CanvasTexture(groundCanvas);
         const surfaceGeo = new THREE.PlaneGeometry(blockX, blockZ);
-        const surfaceMat = new THREE.MeshStandardMaterial({ color: 0x558b2f, side: THREE.DoubleSide });
+        const surfaceMat = new THREE.MeshStandardMaterial({ map: groundTex, side: THREE.DoubleSide, roughness: 0.95 });
         const surfacePlane = new THREE.Mesh(surfaceGeo, surfaceMat);
         surfacePlane.rotation.x = -Math.PI / 2;
         surfacePlane.position.y = 0.01;
         blockGroup.add(surfacePlane);
 
-        // Surface Vegetation (Trees)
-        const trunkGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.4, 4);
-        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.9 });
-        const canopyGeo = new THREE.ConeGeometry(0.3, 1.0, 5);
-        const canopyMat = new THREE.MeshStandardMaterial({ color: 0x2e8b57, roughness: 0.8 });
+        // Surface Vegetation: sparse semi-arid woodland — scattered grey-green eucalypts
+        // with pale trunks, occasional cypress-pine, and low saltbush-like shrubs,
+        // kept clear of the well pads and access track
+        const trunkGeo = new THREE.CylinderGeometry(0.05, 0.07, 0.5, 5);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0xb0a187, roughness: 0.9 });
+        const coneGeo = new THREE.ConeGeometry(0.3, 1.0, 6);
+        const blobGeo = new THREE.SphereGeometry(0.42, 7, 6);
+        const canopyMats = [0x6b7d5a, 0x7a8a62, 0x5f7355, 0x8a9168, 0x74805e].map(c =>
+            new THREE.MeshStandardMaterial({ color: c, roughness: 0.9 }));
+        const shrubMat = new THREE.MeshStandardMaterial({ color: 0x8a8a5e, roughness: 0.95 });
 
-        for (let i = 0; i < 60; i++) {
+        function clearOfInfrastructure(x, z) {
+            if (Math.abs(z - trackZ) < 0.8) return false;                       // on the track
+            if (gasPadXs.some(px => Math.abs(x - px) < 2.4 && Math.abs(z) < 2.0)) return false; // on a pad/spur
+            return !waterBoreXs.some(bx => Math.hypot(x - bx, z) < 1.4);        // inside a bore head
+        }
+
+        let planted = 0;
+        while (planted < 45) {
+            const x = (Math.random() - 0.5) * (blockX - 1);
+            const z = (Math.random() - 0.5) * (blockZ - 1);
+            if (!clearOfInfrastructure(x, z)) continue;
+
             const treeGroup = new THREE.Group();
-            
             const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-            trunk.position.y = 0.2;
-            
-            const canopy = new THREE.Mesh(canopyGeo, canopyMat);
-            canopy.position.y = 0.7;
-            
+            trunk.position.y = 0.25;
             treeGroup.add(trunk);
-            treeGroup.add(canopy);
-            
-            treeGroup.position.x = (Math.random() - 0.5) * (blockX - 1);
-            treeGroup.position.z = (Math.random() - 0.5) * (blockZ - 1);
-            treeGroup.position.y = 0.01;
-            
-            const scale = 0.6 + Math.random() * 0.6;
+
+            const mat = canopyMats[Math.floor(Math.random() * canopyMats.length)];
+            if (Math.random() < 0.8) {
+                // Eucalypt-like: irregular ellipsoid canopy
+                const canopy = new THREE.Mesh(blobGeo, mat);
+                canopy.position.y = 0.75;
+                canopy.scale.set(0.8 + Math.random() * 0.5, 0.7 + Math.random() * 0.6, 0.8 + Math.random() * 0.5);
+                treeGroup.add(canopy);
+            } else {
+                // Cypress-pine (Callitris)
+                const canopy = new THREE.Mesh(coneGeo, mat);
+                canopy.position.y = 0.8;
+                treeGroup.add(canopy);
+            }
+
+            treeGroup.position.set(x, 0.01, z);
+            treeGroup.rotation.y = Math.random() * Math.PI * 2;
+            const scale = 0.8 + Math.random() * 1.0;
             treeGroup.scale.set(scale, scale, scale);
-            
             blockGroup.add(treeGroup);
+            planted++;
+        }
+
+        // Low scattered shrubs (saltbush / scrub tufts)
+        let shrubs = 0;
+        while (shrubs < 50) {
+            const x = (Math.random() - 0.5) * (blockX - 1);
+            const z = (Math.random() - 0.5) * (blockZ - 1);
+            if (!clearOfInfrastructure(x, z)) continue;
+            const shrub = new THREE.Mesh(blobGeo, shrubMat);
+            const sc = 0.25 + Math.random() * 0.35;
+            shrub.scale.set(sc, sc * 0.55, sc);
+            shrub.position.set(x, 0.08, z);
+            blockGroup.add(shrub);
+            shrubs++;
         }
 
         // Particle System
         const particles = [];
-        const particleGeo = new THREE.SphereGeometry(0.3, 8, 8);
+        const particleGeo = new THREE.SphereGeometry(0.16, 8, 8);
         const matWater = new THREE.MeshBasicMaterial({ color: 0x0088ff, depthTest: false, depthWrite: false });
         const matGas = new THREE.MeshBasicMaterial({ color: 0xff4400, depthTest: false, depthWrite: false });
         const matOil = new THREE.MeshBasicMaterial({ color: 0x222222, depthTest: false, depthWrite: false });
@@ -437,6 +618,69 @@
         const infrastructureGroup = new THREE.Group();
         scene.add(infrastructureGroup);
 
+        // Depth (m) to the top of a formation, matching the convention used by the
+        // formation info panel and the depth axis (flat, dip-free, rounded to 50 m).
+        function formationDepthM(layer) {
+            return Math.round(Math.abs(layer.topDepth) / scaleY / 50) * 50;
+        }
+
+        // Build a gas wellhead ("christmas tree"): a stacked valve assembly with
+        // flanges, two wing valves with handwheels, and a top connection. Returns a
+        // Group anchored at ground level (y = 0); pass a scale to size it.
+        const whSteel = new THREE.MeshStandardMaterial({ color: 0x6b7785, roughness: 0.5, metalness: 0.6 });
+        const whFlange = new THREE.MeshStandardMaterial({ color: 0x515b66, roughness: 0.6, metalness: 0.5 });
+        const whWheel = new THREE.MeshStandardMaterial({ color: 0xc0392b, roughness: 0.6 });
+
+        function createGasWellhead(scale) {
+            const g = new THREE.Group();
+
+            // Casing-head spool at the base
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.72, 0.5, 12), whFlange);
+            base.position.y = 0.25;
+            g.add(base);
+
+            // Vertical valve stack (tubing head + master valves)
+            const stackH = 2.2;
+            const stackBase = 0.5;
+            const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, stackH, 12), whSteel);
+            stack.position.y = stackBase + stackH / 2;
+            g.add(stack);
+
+            // Flanges along the stack
+            [0.55, 1.25, 1.95].forEach(yy => {
+                const fl = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 12), whFlange);
+                fl.position.y = stackBase + yy;
+                g.add(fl);
+            });
+
+            // Wing valves: horizontal arms with handwheels on each side
+            function wing(dir) {
+                const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.9, 8), whSteel);
+                arm.rotation.z = Math.PI / 2;
+                arm.position.set(dir * 0.55, stackBase + 0.9, 0);
+                g.add(arm);
+                const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.06, 8, 16), whWheel);
+                wheel.position.set(dir * 1.05, stackBase + 0.9, 0);
+                wheel.rotation.y = Math.PI / 2;
+                g.add(wheel);
+            }
+            wing(1);
+            wing(-1);
+
+            // Top valve handwheel + connection cap
+            const topWheel = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.06, 8, 16), whWheel);
+            topWheel.position.y = stackBase + stackH + 0.12;
+            topWheel.rotation.x = Math.PI / 2;
+            g.add(topWheel);
+
+            const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.28, 10), whSteel);
+            cap.position.y = stackBase + stackH + 0.3;
+            g.add(cap);
+
+            if (scale) g.scale.set(scale, scale, scale);
+            return g;
+        }
+
         function drawVerticalWell(x, targetId, isCSG, wellName) {
             const targetLayer = stratData.find(d => d.id === targetId);
             const actualDepth = targetLayer.centerDepth - getDipAtX(x); // Compute depth on curved layer
@@ -452,15 +696,20 @@
             tube.position.set(x, actualDepth / 2, 0);
             infrastructureGroup.add(tube);
 
-            let headGeo;
+            // Surface equipment: gas wellhead (christmas tree) for CSG, simple head for water
+            // bores — sized to sit in proportion with the surrounding vegetation
+            const headMeshes = [];
             if (isCSG) {
-                headGeo = new THREE.BoxGeometry(1.5, 1.5, 1.5);
+                const wellhead = createGasWellhead(0.45);
+                wellhead.position.set(x, 0, 0);
+                infrastructureGroup.add(wellhead);
+                wellhead.traverse(o => { if (o.isMesh) headMeshes.push(o); });
             } else {
-                headGeo = new THREE.CylinderGeometry(0.8, 0.8, 1.5, 16);
+                const head = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.8, 12), new THREE.MeshStandardMaterial({ color: 0x2980b9 }));
+                head.position.set(x, 0.4, 0);
+                infrastructureGroup.add(head);
+                headMeshes.push(head);
             }
-            const head = new THREE.Mesh(headGeo, new THREE.MeshStandardMaterial({ color: isCSG ? 0x444444 : 0x2980b9 }));
-            head.position.set(x, 0.75, 0);
-            infrastructureGroup.add(head);
 
             const label = document.createElement('div');
             label.className = 'well-label';
@@ -468,7 +717,18 @@
             if(isCSG) label.style.borderBottomColor = '#e74c3c';
             else label.style.borderBottomColor = '#3498db';
             labelsContainer.appendChild(label);
-            wellLabels.push({ element: label, localPos: new THREE.Vector3(x, 3.5, 0) });
+            wellLabels.push({ element: label, localPos: new THREE.Vector3(x, 2.4, 0) });
+
+            // Register clickable well + construction metadata.
+            // Depth matches the target formation's "Depth to Top" shown in the panel.
+            const wellData = {
+                name: wellName,
+                type: isCSG ? 'csg' : 'water',
+                target: targetLayer.name,
+                targetIds: [targetId],
+                depthM: formationDepthM(targetLayer)
+            };
+            [cylinder, tube, ...headMeshes].forEach(m => { m.userData.wellData = wellData; wellMeshes.push(m); });
 
             if(isCSG) {
                 createFlow(x, 0, actualDepth, 0, 'water', 25);
@@ -514,17 +774,30 @@
             const hTube = new THREE.Mesh(hTubeGeo, tMat);
             infrastructureGroup.add(hTube);
 
-            // Surface Unit
-            const head = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial({ color: 0x222222 }));
-            head.position.set(xStart, 1, 0);
-            infrastructureGroup.add(head);
+            // Surface Unit: gas wellhead (christmas tree), in proportion with the vegetation
+            const wellhead = createGasWellhead(0.5);
+            wellhead.position.set(xStart, 0, 0);
+            infrastructureGroup.add(wellhead);
+            const headMeshes = [];
+            wellhead.traverse(o => { if (o.isMesh) headMeshes.push(o); });
 
             const label = document.createElement('div');
             label.className = 'well-label';
             label.innerText = wellName;
             label.style.borderBottomColor = '#e74c3c';
             labelsContainer.appendChild(label);
-            wellLabels.push({ element: label, localPos: new THREE.Vector3(xStart, 3.5, 0) });
+            wellLabels.push({ element: label, localPos: new THREE.Vector3(xStart, 2.4, 0) });
+
+            // Register clickable well + construction metadata (deviated, fractured).
+            // Target depth matches the target formation's "Depth to Top" in the panel.
+            const wellData = {
+                name: wellName,
+                type: 'tightgas',
+                target: 'Kianga / Bandanna Fm & Back Creek Group',
+                targetIds: ['bandanna', 'tinowon'],
+                landing: formationDepthM(targetLayer)
+            };
+            [vCyl, vTube, hCyl, hTube, ...headMeshes].forEach(m => { m.userData.wellData = wellData; wellMeshes.push(m); });
 
             // Pass the targetLayer to dynamically adjust particle flow path
             createFlow(xStart, 0, actualDepth, 0, 'gas', 20, true, xEnd, xStart, targetLayer);
@@ -540,6 +813,403 @@
 
         document.getElementById('loading').style.display = 'none';
 
+        // ---------------------------------------------------------------
+        // Well Construction Schematic (SVG) + Modal
+        // ---------------------------------------------------------------
+        const wellModal = document.getElementById('well-modal-overlay');
+
+        // Preferred display names for the diagram strip-log labels
+        const FM_DISPLAY = {
+            rolling: 'Rolling Downs Grp',
+            blythesdale: 'Blythesdale Grp',
+            walloon: 'Walloon Coal Measures',
+            evergreen: 'Evergreen Fmn',
+            moolayember: 'Moolayember Fmn',
+            clematis: 'Clematis Sst',
+            rewan: 'Rewan Grp',
+            bandanna: 'Kianga/Bandanna Fmn'
+        };
+
+        // Fallback shortening for formations without an explicit display name
+        function shortFm(n) {
+            return n.replace(' Formation', '').replace(' Coal Measures', ' Coal')
+                    .replace(' Group', '').replace(' Sandstone', ' Sst').replace(' Fm', '');
+        }
+
+        // Draw the stratigraphic column as depth-scaled bands behind the well, with
+        // formation names down the left and the target formation(s) highlighted.
+        // depthToY maps a depth in metres to a y pixel; viewH/xRight bound the drawing.
+        // basinBrackets adds right-edge brackets for GAB vs Bowen Basin sediments.
+        // Returns the label markup so callers can layer it on top of the wellbore.
+        function drawFormations(s, depthToY, xRight, viewH, targetIds, basinBrackets) {
+            const labels = [];
+            formationColumn.forEach(f => {
+                let yTop = depthToY(f.topM), yBot = depthToY(f.botM);
+                if (yBot < 0 || yTop > viewH) return;
+                yTop = Math.max(yTop, 0); yBot = Math.min(yBot, viewH);
+                const h = yBot - yTop;
+                if (h <= 0) return;
+
+                // Unconformity: an erosional surface, drawn as a zig-zag line (not a unit band)
+                if (f.id === 'unconformity') {
+                    const yMid = (yTop + yBot) / 2;
+                    let dpath = `M0,${yMid.toFixed(1)}`;
+                    let up = true;
+                    for (let x = 9; x <= xRight; x += 9) { dpath += ` L${x},${(yMid + (up ? -3 : 3)).toFixed(1)}`; up = !up; }
+                    s.push(`<path d="${dpath}" fill="none" stroke="#5e4f33" stroke-width="1.3"/>`);
+                    labels.push(`<rect x="${(xRight / 2 - 76).toFixed(1)}" y="${(yMid - 22).toFixed(1)}" width="152" height="20" rx="4" fill="#ffffff" opacity="0.82"/>`);
+                    labels.push(`<text x="${(xRight / 2).toFixed(1)}" y="${(yMid - 7).toFixed(1)}" font-size="14" fill="#4a3d24" font-weight="bold" text-anchor="middle">Major unconformity</text>`);
+                    return;
+                }
+
+                const isTarget = targetIds && targetIds.includes(f.id);
+                const isGab = f.isGw;
+                s.push(`<rect x="0" y="${yTop.toFixed(1)}" width="${xRight}" height="${h.toFixed(1)}" fill="${f.color}" opacity="${isTarget ? 0.7 : (isGab ? 0.6 : 0.38)}"/>`);
+                // GAB aquifer: blue accent stripe down the left edge
+                if (isGab) s.push(`<rect x="0" y="${yTop.toFixed(1)}" width="5" height="${h.toFixed(1)}" fill="#1f6fb0"/>`);
+                // Target formation: dashed outline
+                if (isTarget) s.push(`<rect x="0" y="${yTop.toFixed(1)}" width="${xRight}" height="${h.toFixed(1)}" fill="none" stroke="#7a5a1f" stroke-width="1.2" stroke-dasharray="4,2"/>`);
+                // Always label aquifers, even thin bands (e.g. Precipice Sst)
+                if (h > 16 || (isGab && h > 6)) {
+                    const label = FM_DISPLAY[f.id] || shortFm(f.name);
+                    const yMid = (yTop + yBot) / 2;
+                    // White pill behind the label so it reads on the coloured band
+                    labels.push(`<rect x="5" y="${(yMid - 11).toFixed(1)}" width="${(label.length * (isGab ? 9.4 : 8.3) + 12).toFixed(0)}" height="22" rx="4" fill="#ffffff" opacity="0.82"/>`);
+                    labels.push(`<text x="11" y="${(yMid + 5).toFixed(1)}" font-size="15" fill="${isGab ? '#0f3f63' : '#33301f'}"${isGab ? ' font-weight="bold"' : ''}>${label}</text>`);
+                }
+            });
+
+            // Right-edge basin brackets: GAB sediments above the unconformity,
+            // Bowen Basin sediments below it
+            if (basinBrackets) {
+                const unc = formationColumn.find(f => f.id === 'unconformity');
+                const yUnc = depthToY((unc.topM + unc.botM) / 2);
+                const yBotAll = Math.min(viewH, depthToY(formationColumn[formationColumn.length - 1].botM));
+                const bx = xRight - 12;
+                function bracket(y1, y2, color, textLabel) {
+                    if (y2 - y1 < 60) return;
+                    labels.push(`<path d="M${bx - 8},${y1.toFixed(1)} L${bx},${y1.toFixed(1)} L${bx},${y2.toFixed(1)} L${bx - 8},${y2.toFixed(1)}" fill="none" stroke="${color}" stroke-width="2"/>`);
+                    const ym = (y1 + y2) / 2;
+                    const pw = textLabel.length * 8 + 14;
+                    labels.push(`<rect x="${(bx - 14 - pw / 2).toFixed(1)}" y="${(ym - 11).toFixed(1)}" width="${pw}" height="22" rx="4" fill="#ffffff" opacity="0.82" transform="rotate(-90 ${bx - 14} ${ym.toFixed(1)})"/>`);
+                    labels.push(`<text x="${bx - 14}" y="${(ym + 5).toFixed(1)}" font-size="14" fill="${color}" font-weight="bold" text-anchor="middle" transform="rotate(-90 ${bx - 14} ${ym.toFixed(1)})">${textLabel}</text>`);
+                }
+                bracket(depthToY(0) + 3, yUnc - 3, '#1f6fb0', 'GAB sediments');
+                bracket(yUnc + 3, yBotAll - 3, '#555555', 'Bowen Basin sediments');
+            }
+            return labels.join('');
+        }
+
+        // Christmas-tree wellhead, front view (mirrors the 3D surface unit). Drawn
+        // sitting on the ground line at centreline `ax`, growing upward; `s` is px/unit.
+        function wellheadTreeSVG(ax, baseY, s) {
+            const X = u => (ax + u * s).toFixed(1);
+            const Y = u => (baseY - u * s).toFixed(1);
+            const W = u => (u * s).toFixed(1);
+            const steel = '#6b7785', flange = '#515b66', wheel = '#c0392b';
+            const t = [];
+            // Casing-head spool at the base
+            t.push(`<polygon points="${X(-0.72)},${Y(0)} ${X(0.72)},${Y(0)} ${X(0.6)},${Y(0.5)} ${X(-0.6)},${Y(0.5)}" fill="${flange}"/>`);
+            // Vertical valve stack
+            t.push(`<rect x="${X(-0.34)}" y="${Y(2.7)}" width="${W(0.68)}" height="${W(2.2)}" fill="${steel}"/>`);
+            // Flanges
+            [1.05, 1.75, 2.45].forEach(yy => t.push(`<rect x="${X(-0.5)}" y="${Y(yy + 0.06)}" width="${W(1.0)}" height="${W(0.12)}" fill="${flange}"/>`));
+            // Wing-valve arms
+            t.push(`<rect x="${X(0.1)}" y="${Y(1.4 + 0.14)}" width="${W(0.9)}" height="${W(0.28)}" fill="${steel}"/>`);
+            t.push(`<rect x="${X(-1.0)}" y="${Y(1.4 + 0.14)}" width="${W(0.9)}" height="${W(0.28)}" fill="${steel}"/>`);
+            // Handwheels
+            const ring = (ux, uy) => `<circle cx="${X(ux)}" cy="${Y(uy)}" r="${W(0.28)}" fill="none" stroke="${wheel}" stroke-width="${W(0.12)}"/>`;
+            t.push(ring(1.05, 1.4));
+            t.push(ring(-1.05, 1.4));
+            t.push(ring(0, 2.82));
+            // Top connection cap
+            t.push(`<rect x="${X(-0.2)}" y="${Y(2.98)}" width="${W(0.4)}" height="${W(0.28)}" fill="${steel}"/>`);
+            return t.join('');
+        }
+
+        // Deviated, hydraulically-fractured tight gas well (matches reference figure)
+        function buildDeviatedSVG(d) {
+            const cx = 290;            // vertical wellbore centreline (right of the formation labels)
+            const surfaceY = 60;       // ground level
+            const kickoffY = 300;      // kickoff point (vertical -> build)
+            const latY = 470;          // horizontal lateral depth
+            const latStartX = 390;     // landing point (build -> horizontal)
+            const latEndX = 800;       // total depth
+            const labelX = 600;        // right-hand label column anchor
+
+            // Single, continuous wellbore centreline: straight down to the kickoff,
+            // a smooth quarter-bend through the build section, then horizontal to TD.
+            // (One path => no crossing lines in the deviated section.)
+            const bore = `M${cx},${surfaceY} L${cx},${kickoffY} Q${cx},${latY} ${latStartX},${latY} L${latEndX},${latY}`;
+
+            const s = [];
+            s.push(`<svg viewBox="0 0 840 600" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">`);
+
+            // Backgrounds
+            s.push(`<rect x="0" y="0" width="840" height="${surfaceY}" fill="#dbe9f5"/>`);
+            s.push(`<rect x="0" y="${surfaceY}" width="840" height="${600 - surfaceY}" fill="#efe6d2"/>`);
+            // Stratigraphic formations, depth-scaled so the lateral lands at the target
+            const depthToY = m => surfaceY + m * (latY - surfaceY) / d.landing;
+            const fmLabels = drawFormations(s, depthToY, 840, 600, d.targetIds, true);
+            // Ground line
+            s.push(`<line x1="0" y1="${surfaceY}" x2="840" y2="${surfaceY}" stroke="#a89b5e" stroke-width="3"/>`);
+
+            // Cement / annulus shading down the vertical section
+            s.push(`<rect x="${cx - 50}" y="${surfaceY}" width="100" height="${kickoffY - surfaceY}" fill="#cfd6da" opacity="0.5"/>`);
+
+            // Wellbore drawn as layered strokes: steel casing wall + hollow bore
+            s.push(`<path d="${bore}" fill="none" stroke="#9aa3a8" stroke-width="13" stroke-linejoin="round"/>`);
+            s.push(`<path d="${bore}" fill="none" stroke="#f5efe3" stroke-width="8" stroke-linejoin="round"/>`);
+
+            // Helper: nested casing string (two vertical lines + shoe triangles)
+            function casing(off, yBot, color, w) {
+                let g = '';
+                g += `<line x1="${cx - off}" y1="${surfaceY}" x2="${cx - off}" y2="${yBot}" stroke="${color}" stroke-width="${w}"/>`;
+                g += `<line x1="${cx + off}" y1="${surfaceY}" x2="${cx + off}" y2="${yBot}" stroke="${color}" stroke-width="${w}"/>`;
+                g += `<path d="M${cx - off},${yBot} l10,0 l-10,-12 z" fill="${color}"/>`;
+                g += `<path d="M${cx + off},${yBot} l-10,0 l10,-12 z" fill="${color}"/>`;
+                return g;
+            }
+            // Casing program (outer -> inner, shallow -> deep)
+            s.push(casing(46, 150, '#555', 3));   // conductor casing
+            s.push(casing(34, 235, '#555', 3));   // surface casing
+            s.push(casing(22, kickoffY, '#555', 3)); // intermediate casing to kickoff
+
+            // (Production casing runs continuously to the toe — no liner)
+
+            // Surface wellhead (christmas tree)
+            s.push(wellheadTreeSVG(cx, surfaceY, 16));
+
+            // Target marker where the lateral enters the reservoir
+            s.push(`<circle cx="${latStartX}" cy="${latY}" r="4" fill="#c0392b"/>`);
+
+            // Vertical hydraulic-fracture network at each stage: a branching, dendritic
+            // crack pattern radiating up/down from a perforation cluster, within a faint
+            // stimulated-rock halo. Looks like a real discrete fracture network.
+            const stageX = [470, 560, 650, 740];
+            // Confine fracture growth to the target interval (Kianga/Bandanna + Back
+            // Creek) so fracs don't propagate into the Rewan seal above or below it
+            const targetFms = formationColumn.filter(f => (d.targetIds || []).includes(f.id));
+            const fracTopY = targetFms.length ? depthToY(Math.min(...targetFms.map(f => f.topM))) + 3 : latY - 44;
+            const fracBotY = targetFms.length ? depthToY(Math.max(...targetFms.map(f => f.botM))) - 3 : latY + 44;
+            function seeded(seed) {
+                let st = seed % 2147483647;
+                if (st <= 0) st += 2147483646;
+                return () => (st = (st * 16807) % 2147483647) / 2147483647;
+            }
+            function fracture(sx) {
+                const g = [];
+                const rand = seeded(Math.round(sx * 7 + 13));
+                // Stimulated rock volume (faint halo spanning the target interval)
+                g.push(`<ellipse cx="${sx}" cy="${((fracTopY + fracBotY) / 2).toFixed(1)}" rx="15" ry="${((fracBotY - fracTopY) / 2).toFixed(1)}" fill="#7fa8d9" opacity="0.15"/>`);
+                const segs = [];
+                function branch(x, y, ang, len, w, depth) {
+                    const rad = ang * Math.PI / 180;
+                    let x2 = x + len * Math.cos(rad);
+                    let y2 = y + len * Math.sin(rad);
+                    // Truncate any segment at the target-interval boundary
+                    if (y2 < fracTopY) { const t = (y - fracTopY) / (y - y2); x2 = x + (x2 - x) * t; y2 = fracTopY; depth = 0; }
+                    else if (y2 > fracBotY) { const t = (fracBotY - y) / (y2 - y); x2 = x + (x2 - x) * t; y2 = fracBotY; depth = 0; }
+                    segs.push([x, y, x2, y2, w]);
+                    if (depth <= 0 || len < 3) return;
+                    const vert = ang < 0 ? -90 : 90;                 // keep the network broadly vertical
+                    const n = rand() < 0.4 ? 1 : 2;
+                    for (let i = 0; i < n; i++) {
+                        const side = i === 0 ? -1 : 1;
+                        let a = ang + side * (12 + rand() * 22);
+                        a = a * 0.7 + vert * 0.3;                    // bias branches back toward vertical
+                        branch(x2, y2, a, len * 0.72, w * 0.68, depth - 1);
+                    }
+                    if (rand() < 0.6) branch(x2, y2, ang + (rand() - 0.5) * 12, len * 0.8, w * 0.85, depth - 1);
+                }
+                // Trunk lengths sized to the interval (network total reach ~2.9x trunk)
+                const upLen = Math.max(4, (latY - fracTopY) * 0.34);
+                const downLen = Math.max(4, (fracBotY - latY) * 0.34);
+                branch(sx, latY, -90 + (rand() - 0.5) * 12, upLen, 1.5, 4);  // upward trunk
+                branch(sx, latY,  90 + (rand() - 0.5) * 12, downLen, 1.5, 4); // downward trunk
+                segs.forEach(p => g.push(`<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${p[2].toFixed(1)}" y2="${p[3].toFixed(1)}" stroke="#222" stroke-width="${p[4].toFixed(2)}" stroke-linecap="round"/>`));
+                // Perforation cluster at the wellbore
+                g.push(`<circle cx="${sx}" cy="${latY}" r="2.4" fill="#c0392b"/>`);
+                return g.join('');
+            }
+            stageX.forEach(sx => s.push(fracture(sx)));
+
+            // Total-depth completion device (perforating/frac assembly)
+            s.push(`<rect x="${latEndX - 26}" y="${latY - 7}" width="26" height="14" fill="#2c3e50"/>`);
+            for (let i = 0; i < 4; i++) {
+                s.push(`<rect x="${latEndX - 26 + i * 6}" y="${latY - 7}" width="3" height="14" fill="${i % 2 ? '#c0392b' : '#2980b9'}"/>`);
+            }
+
+            // ---- Labels (right column with leader lines, ordered by depth) ----
+            function lbl(y, anchorX, anchorY, text) {
+                let g = `<line x1="${labelX - 6}" y1="${y}" x2="${anchorX}" y2="${anchorY}" stroke="#999" stroke-width="1"/>`;
+                const pw = Math.min(text.length * 8.6 + 14, 840 - (labelX - 6) - 3);
+                g += `<rect x="${labelX - 6}" y="${y - 13}" width="${pw.toFixed(0)}" height="26" rx="4" fill="#ffffff" opacity="0.82"/>`;
+                g += `<text x="${labelX}" y="${y + 5}" font-size="16" fill="#1a1a1a">${text}</text>`;
+                return g;
+            }
+            s.push(lbl(150, cx + 46, 150, 'Conductor casing'));
+            s.push(lbl(200, cx + 34, 205, 'Surface casing'));
+            s.push(lbl(285, cx + 22, 285, 'Intermediate casing'));
+            s.push(lbl(340, cx + 32, 438, 'Production casing')); // anchored on the build curve
+
+            // Target-depth callout (where the well reaches the reservoir)
+            s.push(`<rect x="${latStartX - 58}" y="${latY + 34}" width="116" height="38" rx="4" fill="#ffffff" opacity="0.78"/>`);
+            s.push(`<text x="${latStartX}" y="${latY + 48}" font-size="16" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Target depth</text>`);
+            s.push(`<text x="${latStartX}" y="${latY + 65}" font-size="14" fill="#444" text-anchor="middle">~${d.landing} m</text>`);
+
+            // "Vertical frac stages" banner
+            s.push(`<rect x="525" y="398" width="160" height="22" rx="3" fill="#dbeaf6" stroke="#2B7CB5"/>`);
+            s.push(`<text x="605" y="415" font-size="14" fill="#1f5a85" text-anchor="middle" font-weight="bold">Vertical frac stages</text>`);
+            stageX.forEach(sx => s.push(`<line x1="605" y1="420" x2="${sx}" y2="${fracTopY.toFixed(1)}" stroke="#2B7CB5" stroke-width="0.8" stroke-dasharray="2,2"/>`));
+
+            // Formation labels last, so they sit above the casing strings
+            s.push(fmLabels);
+            s.push(`</svg>`);
+            return s.join('');
+        }
+
+        // Cased vertical well: CSG (gas) has conductor/surface/production casing + tubing;
+        // a water bore is a single slotted casing with no production tubing.
+        function buildVerticalSVG(d) {
+            const cx = 230;
+            const surfaceY = 52;
+            const tdY = 470;
+            const perfTop = 396;
+            const isCSG = d.type === 'csg';
+            const labelX = 440;
+
+            const s = [];
+            s.push(`<svg viewBox="0 0 640 560" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial, sans-serif">`);
+            s.push(`<rect x="0" y="0" width="640" height="${surfaceY}" fill="#dbe9f5"/>`);
+            s.push(`<rect x="0" y="${surfaceY}" width="640" height="${560 - surfaceY}" fill="#efe6d2"/>`);
+            // Stratigraphic formations, depth-scaled so the target sits at the completion zone
+            const depthToY = m => surfaceY + m * (perfTop - surfaceY) / d.depthM;
+            const fmLabels = drawFormations(s, depthToY, 640, 560, d.targetIds);
+            s.push(`<line x1="0" y1="${surfaceY}" x2="640" y2="${surfaceY}" stroke="#a89b5e" stroke-width="3"/>`);
+
+            // Cement / borehole annulus (sized to the outermost casing)
+            const outer = isCSG ? 42 : 18;
+            s.push(`<rect x="${cx - outer - 4}" y="${surfaceY}" width="${(outer + 4) * 2}" height="${tdY - surfaceY}" fill="#cfd6da" opacity="0.5"/>`);
+
+            function casing(off, yBot, color) {
+                let g = '';
+                g += `<line x1="${cx - off}" y1="${surfaceY}" x2="${cx - off}" y2="${yBot}" stroke="${color}" stroke-width="3"/>`;
+                g += `<line x1="${cx + off}" y1="${surfaceY}" x2="${cx + off}" y2="${yBot}" stroke="${color}" stroke-width="3"/>`;
+                g += `<path d="M${cx - off},${yBot} l11,0 l-11,-13 z" fill="${color}"/>`;
+                g += `<path d="M${cx + off},${yBot} l-11,0 l11,-13 z" fill="${color}"/>`;
+                return g;
+            }
+
+            function lbl(y, anchorX, anchorY, text) {
+                let g = `<line x1="${labelX - 6}" y1="${y}" x2="${anchorX}" y2="${anchorY}" stroke="#999" stroke-width="1"/>`;
+                const pw = Math.min(text.length * 8.6 + 14, 640 - (labelX - 6) - 3);
+                g += `<rect x="${labelX - 6}" y="${y - 13}" width="${pw.toFixed(0)}" height="26" rx="4" fill="#ffffff" opacity="0.82"/>`;
+                g += `<text x="${labelX}" y="${y + 5}" font-size="16" fill="#1a1a1a">${text}</text>`;
+                return g;
+            }
+
+            if (isCSG) {
+                // Three casing strings: conductor -> surface -> production (through the seams)
+                s.push(casing(42, 150, '#555'));   // conductor casing
+                s.push(casing(30, 250, '#555'));   // surface casing
+                s.push(casing(18, tdY, '#555'));   // production casing
+
+                // Gas wellhead (christmas tree)
+                s.push(wellheadTreeSVG(cx, surfaceY, 14));
+
+                // Perforations across the coal seams
+                for (let y = perfTop + 6; y < tdY; y += 16) {
+                    s.push(`<path d="M${cx - 18},${y} l-12,6 M${cx - 18},${y + 6} l-12,-6" stroke="#c0392b" stroke-width="1.4"/>`);
+                    s.push(`<path d="M${cx + 18},${y} l12,6 M${cx + 18},${y + 6} l12,-6" stroke="#c0392b" stroke-width="1.4"/>`);
+                }
+
+                s.push(lbl(120, cx + 42, 130, 'Conductor casing'));
+                s.push(lbl(210, cx + 30, 235, 'Surface casing'));
+                s.push(lbl(300, cx + 18, 330, 'Production casing'));
+                s.push(lbl(perfTop + 50, cx + 30, perfTop + 30, 'Perforated coal seams'));
+            } else {
+                // Water bore: a single casing, slotted through the aquifer, no production tubing
+                // Solid casing down to the top of the screen
+                s.push(`<line x1="${cx - 18}" y1="${surfaceY}" x2="${cx - 18}" y2="${perfTop}" stroke="#555" stroke-width="3"/>`);
+                s.push(`<line x1="${cx + 18}" y1="${surfaceY}" x2="${cx + 18}" y2="${perfTop}" stroke="#555" stroke-width="3"/>`);
+                // Slotted screen through the aquifer
+                s.push(`<line x1="${cx - 18}" y1="${perfTop}" x2="${cx - 18}" y2="${tdY}" stroke="#777" stroke-width="3"/>`);
+                s.push(`<line x1="${cx + 18}" y1="${perfTop}" x2="${cx + 18}" y2="${tdY}" stroke="#777" stroke-width="3"/>`);
+                for (let y = perfTop + 6; y < tdY - 2; y += 7) {
+                    s.push(`<line x1="${cx - 23}" y1="${y}" x2="${cx - 13}" y2="${y}" stroke="#fff" stroke-width="1.8"/>`);
+                    s.push(`<line x1="${cx + 13}" y1="${y}" x2="${cx + 23}" y2="${y}" stroke="#fff" stroke-width="1.8"/>`);
+                }
+                // Base cap
+                s.push(`<line x1="${cx - 18}" y1="${tdY}" x2="${cx + 18}" y2="${tdY}" stroke="#555" stroke-width="3"/>`);
+
+                // Simple bore head
+                s.push(`<rect x="${cx - 16}" y="${surfaceY - 34}" width="32" height="34" fill="#2980b9"/>`);
+                s.push(`<circle cx="${cx}" cy="${surfaceY - 38}" r="8" fill="#2980b9"/>`);
+
+                s.push(lbl(150, cx + 18, 160, 'Casing'));
+                s.push(lbl(perfTop + 45, cx + 23, perfTop + 45, 'Slotted screen (intake)'));
+            }
+
+            s.push(`<rect x="${cx - 105}" y="${tdY + 10}" width="210" height="24" rx="4" fill="#ffffff" opacity="0.78"/>`);
+            s.push(`<text x="${cx}" y="${tdY + 27}" font-size="16" fill="#1a1a1a" text-anchor="middle" font-weight="bold">Target depth ~${d.depthM} m</text>`);
+
+            // Formation labels last, so they sit above the casing strings
+            s.push(fmLabels);
+            s.push(`</svg>`);
+            return s.join('');
+        }
+
+        function openWellModal(data) {
+            const titles = {
+                tightgas: 'Tight Gas Well — Typical Construction',
+                csg: 'Coal Seam Gas Well — Typical Construction',
+                water: 'Water Supply Bore — Typical Construction'
+            };
+            const subs = {
+                tightgas: 'Deviated, hydraulically fractured completion',
+                csg: 'Vertical, perforated coal-seam completion',
+                water: 'Vertical, screened completion'
+            };
+            document.getElementById('wm-title').innerText = titles[data.type] || data.name;
+            document.getElementById('wm-subtitle').innerText = subs[data.type] || '';
+
+            document.getElementById('wm-diagram').innerHTML =
+                data.type === 'tightgas' ? buildDeviatedSVG(data) : buildVerticalSVG(data);
+
+            // Spec list
+            const specs = [];
+            specs.push(['Well', data.name]);
+            specs.push(['Target formation', data.target]);
+            if (data.type === 'tightgas') {
+                specs.push(['Completion', 'Cased & cemented, multi-stage hydraulic fracture']);
+                specs.push(['Casing program', 'Conductor, surface, intermediate & production casing (run to TD)']);
+                specs.push(['Target depth', '~' + data.landing + ' m']);
+                specs.push(['Stimulation', 'Vertical frac stages']);
+            } else if (data.type === 'csg') {
+                specs.push(['Completion', 'Cased & perforated across coal seams']);
+                specs.push(['Casing program', 'Conductor, surface & production casing']);
+                specs.push(['Target depth', '~' + data.depthM + ' m']);
+                specs.push(['Produced', 'Coal seam gas + associated water']);
+            } else {
+                specs.push(['Completion', 'Single slotted casing (no production tubing)']);
+                specs.push(['Casing program', 'Single casing, slotted through the aquifer']);
+                specs.push(['Target depth', '~' + data.depthM + ' m']);
+                specs.push(['Produced', 'Groundwater']);
+            }
+            document.getElementById('wm-spec-list').innerHTML = specs.map(
+                ([k, v]) => `<div class="wm-spec"><span class="k">${k}</span><span class="v">${v}</span></div>`
+            ).join('');
+
+            wellModal.style.display = 'flex';
+        }
+
+        function closeWellModal() { wellModal.style.display = 'none'; }
+
+        document.getElementById('wm-close').addEventListener('click', closeWellModal);
+        wellModal.addEventListener('click', (e) => { if (e.target === wellModal) closeWellModal(); });
+        window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeWellModal(); });
+
         // Interaction
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -551,6 +1221,15 @@
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
+
+            // Wells are clickable — show pointer when hovering one
+            if (raycaster.intersectObjects(wellMeshes).length > 0) {
+                document.body.style.cursor = 'pointer';
+                if (hoveredMesh && hoveredMesh.material.emissive) hoveredMesh.material.emissive.setHex(0x000000);
+                hoveredMesh = null;
+                return;
+            }
+
             const intersects = raycaster.intersectObjects(layerMeshes);
 
             if (intersects.length > 0) {
@@ -580,8 +1259,20 @@
         });
 
         window.addEventListener('click', (e) => {
-            if(e.target.closest('.controls') || e.target.closest('#legend')) return;
+            if(e.target.closest('.controls') || e.target.closest('#legend') || e.target.closest('#well-modal')) return;
             raycaster.setFromCamera(mouse, camera);
+
+            // Wells take priority — clicking one opens the construction schematic
+            const wellHits = raycaster.intersectObjects(wellMeshes);
+            if (wellHits.length > 0) {
+                const wd = wellHits[0].object.userData.wellData;
+                if (wd) {
+                    dataPanel.style.display = 'none';
+                    openWellModal(wd);
+                    return;
+                }
+            }
+
             const intersects = raycaster.intersectObjects(layerMeshes);
 
             if (intersects.length > 0) {
